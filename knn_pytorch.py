@@ -83,9 +83,9 @@ class TestKNearestNeighbor(unittest.TestCase):
     def test_forward1(self):
         B, D, N, M = 5, 4, 6500, 6500
         k = 16
-        ref = Variable(torch.rand(B, D, N))
-        query = Variable(torch.rand(B, D, M))
         for _ in range(10):
+            ref = Variable(torch.rand(B, D, N))
+            query = Variable(torch.rand(B, D, M))
             print('*', end='', flush=True)
             feat, ind = KNearestNeighbor(k)(ref, query)
             pyfeat = py_gather_nn(query, ind)
@@ -105,8 +105,8 @@ class TestKNearestNeighbor(unittest.TestCase):
     def test_forward3(self):
         B, D, N = 5, 10, 6500
         k = 16
-        ref = Variable(torch.rand(B, D, N))
         for _ in range(10):
+            ref = Variable(torch.rand(B, D, N))
             print('*', end='', flush=True)
             feat, ind = KNearestNeighbor(k)(ref)
             pyfeat = py_gather_nn(ref, ind)
