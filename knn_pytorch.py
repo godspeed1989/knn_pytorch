@@ -4,7 +4,7 @@ import torch
 from torch.autograd import Variable, Function
 import numpy as np
 
-from gather_nn_cuda import gather_nn
+from .gather_nn_cuda import gather_nn
 
 class KNearestNeighbor(Function):
     """ Compute k nearest neighbors for each query point.
@@ -53,6 +53,11 @@ class KNearestNeighbor(Function):
         feat = torch.transpose(feat, 1, 3)
 
         return feat, top_ind
+
+    def backward(self, grad, retain_graph):
+        output_grad = torch.mean(grad, dim=2, keepdim=False)
+        return output_grad
+
 
 """
 python version gather_nn, very slow....

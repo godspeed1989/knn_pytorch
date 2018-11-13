@@ -42,7 +42,7 @@ void gather_nn_dev(
   else if (all <= 1024)
     blockSize.x = 256;
   else
-    blockSize.x = 256;
+    blockSize.x = 512;
   dim3 gridSize((all + blockSize.x - 1) / blockSize.x);
 
   gather_nn_kernel<<<gridSize, blockSize>>>(
