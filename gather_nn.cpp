@@ -7,17 +7,19 @@
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
 void gather_nn_dev(
-  float* query_dev, long* ind_dev,
+  float* ref_dev, float* query_dev, long* ind_dev,
   int64_t B, int64_t N, int64_t k, int64_t Dim, int64_t M,
   float* out_feat_dev
 );
 
 /**
+ * ref_tensor     B,N,D
  * query_tensor   B,M,D
  * ind_tensor     B,N,K
  * feat_tensor    B,N,K,D
  */
 int gather_nn(
+  at::Tensor ref_tensor,
   at::Tensor query_tensor,
   at::Tensor ind_tensor,
   at::Tensor out_feat_tensor) {
@@ -28,9 +30,12 @@ int gather_nn(
 
   AT_ASSERTM(ind_tensor.size(0) == query_tensor.size(0), "batch size not match 1")
   AT_ASSERTM(query_tensor.size(0) == out_feat_tensor.size(0), "batch size not match 2")
-  AT_ASSERTM(ind_tensor.size(1) == out_feat_tensor.size(1), "N not match")
+  AT_ASSERTM(query_tensor.size(0) == ref_tensor.size(0), "batch size not match 3")
+  AT_ASSERTM(ind_tensor.size(1) == ref_tensor.size(1), "N not match 1")
+  AT_ASSERTM(ind_tensor.size(1) == out_feat_tensor.size(1), "N not match 2")
   AT_ASSERTM(ind_tensor.size(2) == out_feat_tensor.size(2), "k not match")
-  AT_ASSERTM(query_tensor.size(2) == out_feat_tensor.size(3), "dim size not match")
+  AT_ASSERTM(query_tensor.size(2) == ref_tensor.size(2), "dim size not match 1")
+  AT_ASSERTM(query_tensor.size(2) == out_feat_tensor.size(3), "dim size not match 2")
 
   int64_t batch = query_tensor.size(0);
   int64_t M = query_tensor.size(1);
@@ -45,12 +50,13 @@ int gather_nn(
   std::cout << "k:" << k << std::endl;
   std::cout << "N:" << N << std::endl;
 #endif
+  float *ref_dev = ref_tensor.data<float>();
   float *query_dev = query_tensor.data<float>();
   long *ind_dev = ind_tensor.data<long>();
   float *out_feat_dev = out_feat_tensor.data<float>();
 
   gather_nn_dev(
-    query_dev, ind_dev,
+    ref_dev, query_dev, ind_dev,
     batch, N, k, Dim, M,
     out_feat_dev
   );

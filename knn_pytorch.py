@@ -52,7 +52,7 @@ class KNearestNeighbor(Function):
 
         # B,N,K,D
         feat = torch.empty(ref.size(0), ref.size(2), self.k, ref.size(1)).float().cuda().contiguous()
-        gather_nn(query_t.contiguous(), top_ind.contiguous(), feat)
+        gather_nn(ref_t.contiguous(), query_t.contiguous(), top_ind.contiguous(), feat)
         # B,N,K,D -> B,D,K,N
         feat = torch.transpose(feat, 1, 3)
 
@@ -66,24 +66,27 @@ class KNearestNeighbor(Function):
 """
 python version gather_nn, very slow....
 Input
+    ref     B,D,N
     query   B,D,M
     ind     B,N,K
 Output
     feat    B,D,K,N
 """
-def py_gather_nn(query, ind):
+def py_gather_nn(ref, query, ind):
     query = query.cpu()
     ind = ind.cpu()
     B = ind.size(0)
     N = ind.size(1)
     K = ind.size(2)
+    # B,x,D
+    ref = torch.transpose(ref, 1, 2)
     query = torch.transpose(query, 1, 2)
     # B,N,K,D
     feat = torch.empty(ind.size(0), ind.size(1), ind.size(2), query.size(2)).float()
     for iB in range(B):
         for iN in range(N):
             for i in range(K):
-                feat[iB, iN, i] = query[iB, ind[iB, iN, i]]
+                feat[iB, iN, i] = query[iB, ind[iB, iN, i]] - ref[iB, iN]
     # B,N,K,D -> B,D,K,N
     feat = torch.transpose(feat, 1, 3)
     return feat
@@ -93,33 +96,60 @@ class TestKNearestNeighbor(unittest.TestCase):
         B, D, N, M = 5, 4, 6500, 6500
         k = 16
         for _ in range(10):
-            ref = Variable(torch.rand(B, D, N))
-            query = Variable(torch.rand(B, D, M))
+            ref = Variable(torch.randn(B, D, N, dtype=torch.float))
+            query = Variable(torch.randn(B, D, M, dtype=torch.float))
             print('*', end='', flush=True)
             feat, ind = KNearestNeighbor(k)(ref, query)
-            pyfeat = py_gather_nn(query, ind)
+            pyfeat = py_gather_nn(ref, query, ind)
             assert torch.equal(pyfeat, feat.cpu()), "python & cuda version not match"
 
     def test_forward2(self):
         # 1, 2, 3
-        ref = Variable(torch.Tensor([[[0,10,100], [0,10,100]]]))
+        ref = Variable(torch.tensor([[[0,10,100], [0,10,100]]], dtype=torch.float))
         # 1, 2, 6
-        query = Variable(torch.Tensor([[[1,2,11,12,101,102], [1,2,11,12,101,102]]]))
+        query = Variable(torch.tensor([[[1,2,11,12,101,102], [1,2,11,12,101,102]]], dtype=torch.float))
         feat, ind = KNearestNeighbor(4)(ref, query)
         print('\n{}'.format(ind.cpu().numpy()))
         print('\n{}'.format(feat.cpu().numpy()))
-        pyfeat = py_gather_nn(query, ind)
+        pyfeat = py_gather_nn(ref, query, ind)
+        print('\n{}'.format(pyfeat.cpu().numpy()))
         assert torch.equal(pyfeat, feat.cpu()), "python & cuda version not match"
 
     def test_forward3(self):
         B, D, N = 5, 10, 6500
         k = 16
         for _ in range(10):
-            ref = Variable(torch.rand(B, D, N))
+            ref = Variable(torch.randn(B, D, N, dtype=torch.float))
             print('*', end='', flush=True)
             feat, ind = KNearestNeighbor(k)(ref)
-            pyfeat = py_gather_nn(ref, ind)
+            pyfeat = py_gather_nn(ref, ref, ind)
             assert torch.equal(pyfeat, feat.cpu()), "python & cuda version not match"
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+# [[[0 1 2 3]
+#   [2 3 1 0]
+#   [4 5 3 2]]]
+
+# [[[[  1.  11. 101.]
+#    [  2.  12. 102.]
+#    [ 11.   2.  12.]
+#    [ 12.   1.  11.]]
+
+#   [[  1.  11. 101.]
+#    [  2.  12. 102.]
+#    [ 11.   2.  12.]
+#    [ 12.   1.  11.]]]]
+# [[[0 1 2 3]
+#   [2 3 1 0]
+#   [4 5 3 2]]]
+
+# [[[[  1.         11.        101.       ]
+#    [ -8.          2.         92.       ]
+#    [-89.        -98.        -88.       ]
+#    [ 11.96706     0.9670604  10.96706  ]]
+
+#   [[  1.         11.        101.       ]
+#    [ -8.          2.         92.       ]
+#    [-89.        -98.        -88.       ]
+#    [ 11.941363    0.9413633  10.941363 ]]]]
