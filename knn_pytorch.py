@@ -1,10 +1,14 @@
+import os
+import sys
 import unittest
 
 import torch
 from torch.autograd import Variable, Function
 import numpy as np
 
-from .gather_nn_cuda import gather_nn
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+from gather_nn_cuda import gather_nn
 
 class KNearestNeighbor(Function):
     """ Compute k nearest neighbors for each query point.
